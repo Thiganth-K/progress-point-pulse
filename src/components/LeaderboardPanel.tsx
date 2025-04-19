@@ -1,16 +1,18 @@
-
 import { useState } from "react";
 import { useStudents } from "@/context/StudentContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Medal, TrendingUp, BarChart } from "lucide-react";
+import { Medal, TrendingUp, BarChart, Loader } from "lucide-react";
 import { Student } from "@/types";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 const LeaderboardPanel = () => {
   const { students, updateStudentMarks } = useStudents();
   const [editMode, setEditMode] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const { toast } = useToast();
   const [editValues, setEditValues] = useState<Record<string, {
     presentation: string;
     efforts: string;
@@ -40,6 +42,35 @@ const LeaderboardPanel = () => {
     setEditMode(!editMode);
   };
 
+  // Save changes with loading animation
+  const saveChanges = async () => {
+    setIsUpdating(true);
+    try {
+      // Simulate a network delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      students.forEach(student => {
+        const studentEdits = editValues[student.id];
+        if (studentEdits) {
+          updateStudentMarks(student.id, {
+            presentation: Number(studentEdits.presentation),
+            efforts: Number(studentEdits.efforts),
+            assignment: Number(studentEdits.assignment),
+            assessment: Number(studentEdits.assessment),
+          });
+        }
+      });
+      
+      toast({
+        title: "Success",
+        description: "Leaderboard has been updated successfully",
+      });
+    } finally {
+      setIsUpdating(false);
+      setEditMode(false);
+    }
+  };
+
   // Handle input change
   const handleInputChange = (studentId: string, field: keyof typeof editValues[string], value: string) => {
     // Only allow numbers 0-100
@@ -52,22 +83,6 @@ const LeaderboardPanel = () => {
         [field]: numValue.toString()
       }
     }));
-  };
-
-  // Save changes
-  const saveChanges = () => {
-    students.forEach(student => {
-      const studentEdits = editValues[student.id];
-      if (studentEdits) {
-        updateStudentMarks(student.id, {
-          presentation: Number(studentEdits.presentation),
-          efforts: Number(studentEdits.efforts),
-          assignment: Number(studentEdits.assignment),
-          assessment: Number(studentEdits.assessment),
-        });
-      }
-    });
-    setEditMode(false);
   };
 
   return (
@@ -90,6 +105,7 @@ const LeaderboardPanel = () => {
           editValues={editValues}
           onChange={handleInputChange}
           onSave={saveChanges}
+          isUpdating={isUpdating}
         />
       ) : (
         <LeaderboardView students={students} />
@@ -246,9 +262,10 @@ interface EditMarksViewProps {
   }>;
   onChange: (studentId: string, field: string, value: string) => void;
   onSave: () => void;
+  isUpdating: boolean;
 }
 
-const EditMarksView = ({ students, editValues, onChange, onSave }: EditMarksViewProps) => {
+const EditMarksView = ({ students, editValues, onChange, onSave, isUpdating }: EditMarksViewProps) => {
   return (
     <div className="space-y-6">
       <Card className="glassmorphism border-2 border-orange-200 dark:border-orange-800">
@@ -273,6 +290,7 @@ const EditMarksView = ({ students, editValues, onChange, onSave }: EditMarksView
                       value={editValues[student.id]?.presentation || ''}
                       onChange={(e) => onChange(student.id, 'presentation', e.target.value)}
                       className="h-9"
+                      disabled={isUpdating}
                     />
                   </div>
                   
@@ -287,6 +305,7 @@ const EditMarksView = ({ students, editValues, onChange, onSave }: EditMarksView
                       value={editValues[student.id]?.efforts || ''}
                       onChange={(e) => onChange(student.id, 'efforts', e.target.value)}
                       className="h-9"
+                      disabled={isUpdating}
                     />
                   </div>
                   
@@ -301,6 +320,7 @@ const EditMarksView = ({ students, editValues, onChange, onSave }: EditMarksView
                       value={editValues[student.id]?.assignment || ''}
                       onChange={(e) => onChange(student.id, 'assignment', e.target.value)}
                       className="h-9"
+                      disabled={isUpdating}
                     />
                   </div>
                   
@@ -315,6 +335,7 @@ const EditMarksView = ({ students, editValues, onChange, onSave }: EditMarksView
                       value={editValues[student.id]?.assessment || ''}
                       onChange={(e) => onChange(student.id, 'assessment', e.target.value)}
                       className="h-9"
+                      disabled={isUpdating}
                     />
                   </div>
                 </div>
@@ -326,8 +347,16 @@ const EditMarksView = ({ students, editValues, onChange, onSave }: EditMarksView
             <Button 
               onClick={onSave}
               className="bg-orange-600 hover:bg-orange-700 transition-colors"
+              disabled={isUpdating}
             >
-              Update & Sort Leaderboard
+              {isUpdating ? (
+                <>
+                  <Loader className="w-4 h-4 mr-2 animate-spin" />
+                  Updating Leaderboard...
+                </>
+              ) : (
+                'Update & Sort Leaderboard'
+              )}
             </Button>
           </div>
         </CardContent>
